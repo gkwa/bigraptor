@@ -1,10 +1,10 @@
 /*
 Copyright © 2023 NAME HERE <EMAIL ADDRESS>
-
 */
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 
@@ -26,7 +26,7 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
+	Run: func(cmd *cobra.Command, args []string) {},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -58,20 +58,64 @@ func initConfig() {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
 	} else {
-		// Find home directory.
-		home, err := os.UserHomeDir()
-		cobra.CheckErr(err)
-
 		// Search config in home directory with name ".bigraptor" (without extension).
-		viper.AddConfigPath(home)
+		viper.AddConfigPath(".")
 		viper.SetConfigType("yaml")
 		viper.SetConfigName(".bigraptor")
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
 
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+	configFileName := ".bigraptor.yaml"
+
+	// Read the config file
+	err := viper.ReadInConfig()
+	if err != nil {
+		fmt.Println("Error reading config file:", err)
+		os.Exit(1)
 	}
+
+	writeDefaultConfig(configFileName)
+
+	// Access the configuration values
+	region := viper.GetString("sns.region")
+	topicArn := viper.GetString("sns.topic-arn")
+	// ... access other configuration values as needed ...
+	fmt.Printf("sns.region: %s\n", region)
+	fmt.Printf("sns.topic-arn: %s\n", topicArn)
+}
+
+func writeDefaultConfig(configFileName string) {
+	yamlExample := []byte(`
+sns:
+  region: us-west-2
+  topic-arn: arn:aws:sns:us-west-2:123456789012:example-topic
+  apple: pear
+sqs:
+  queue-arn: arn:aws:sqs:us-west-2:123456789012
+  queue-url: https://sqs.us-west-2.amazonaws.com/123456789012/somename
+  region: us-west-2
+s3bucket:
+  name: mybucket
+  region: us-west-2
+  s3path: .bigraptor.yaml
+client:
+  push-frequency: 4m
+`)
+
+	// Initialize the default configuration
+	err := viper.MergeConfig(bytes.NewBuffer(yamlExample))
+	if err != nil {
+		fmt.Println("Error initializing default config:", err)
+		os.Exit(1)
+	}
+
+	// Save the merged configuration, including new default values
+	err = viper.WriteConfig()
+	if err != nil {
+		fmt.Println("Error writing config file:", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Default configuration written to %s\n", configFileName)
 }
